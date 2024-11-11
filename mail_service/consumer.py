@@ -1,0 +1,1 @@
+print("i am in consumer.py of mail_service")

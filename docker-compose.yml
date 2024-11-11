@@ -1,0 +1,79 @@
+version: '3'
+services:
+  db-sql:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: omermunk
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: my_store_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  db-mongo:
+    image: mongo:4.4
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo-data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  main_service:
+    build: ./main_service
+    depends_on:
+      - db-sql
+      - rabbitmq
+    ports:
+      - "5001:5001"
+    environment:
+      - DATABASE_URL=postgresql://omermunk:1234@db:5432/users_subjects_db
+
+  mail_service:
+    build: ./mail_service
+    depends_on:
+      - rabbitmq
+    ports:
+      - "5002:5002"
+    environment:
+      - DATABASE_URL=postgresql://omermunk:1234@db:5432/users_subjects_db
+
+  shipping_service:
+    build: ./shipping_service
+    depends_on:
+      - db-mongo
+      - rabbitmq
+    ports:
+      - "5003:5003"
+    environment:
+      - DATABASE_URL=postgresql://omermunk:1234@db:5432/users_subjects_db
+
+  purchase_service:
+    build: ./purchase_service
+    depends_on:
+      - db-mongo
+      - rabbitmq
+    ports:
+      - "5004:5004"
+    environment:
+      - DATABASE_URL=postgresql://omermunk:1234@db:5432/users_subjects_db
+
+  inventory_service:
+    build: ./inventory_service
+    depends_on:
+      - db-sql
+      - rabbitmq
+    ports:
+      - "5005:5005"
+    environment:
+      - DATABASE_URL=postgresql://omermunk:1234@db:5432/users_subjects_db
+
+
+
+volumes:
+  db_data:
