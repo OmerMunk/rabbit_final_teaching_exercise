@@ -1,20 +1,36 @@
 import pika
 import pymongo
 import json
-
+import os
+import time
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 
-
-client = pymongo.MongoClient('localhost', 27017)
-db = client['shipping_db']
-collection = db['shipping']
+rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'rabbitmq')
+mongo_host = os.environ.get('MONGO_HOST', 'db-mongo')
 
 
-rabbitmq_host = 'rabbitmq'
-connection = pika.BlockingConnection(pika.ConnectionParameters(rabbitmq_host))
+def connect_mongo():
+    while True:
+        try:
+            client = pymongo.MongoClient(host=mongo_host, port=27017, serverSelectionTimeoutMS=5000)
+            client.admin.command('ismaster')
+            print("Connected to MongoDB")
+            return client
+        except pymongo.errors.ServerSelectionTimeoutError as err:
+            print(f"MongoDB connection error: {err}")
+            time.sleep(5)
 
-
+def connect_rabbitmq():
+    while True:
+        try:
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitmq_host))
+            print("Connected to RabbitMQ")
+            return connection
+        except pika.exceptions.AMQPConnectionError as err:
+            print(f"RabbitMQ connection error: {err}")
+            time.sleep(5)
 
 def callback(ch, method, properties, body):
     data = json.loads(body)
@@ -24,8 +40,14 @@ def callback(ch, method, properties, body):
     print(" [x] Done")
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
-
 def main():
+    global collection
+
+    client = connect_mongo()
+    db = client['shipping_db']
+    collection = db['shipping']
+
+    connection = connect_rabbitmq()
     channel = connection.channel()
     channel.exchange_declare(exchange='main_exchange', exchange_type='topic')
 
@@ -34,8 +56,7 @@ def main():
 
     channel.basic_qos(prefetch_count=1)
 
-    channel.basic_consume(queue='shipping_queue',on_message_callback=callback)
-
+    channel.basic_consume(queue='shipping_queue', on_message_callback=callback)
 
     print(' [*] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()

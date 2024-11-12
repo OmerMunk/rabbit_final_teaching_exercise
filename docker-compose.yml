@@ -10,6 +10,11 @@ services:
       - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   db-mongo:
     image: mongo:4.4
@@ -17,12 +22,22 @@ services:
       - "27017:27017"
     volumes:
       - ./mongo-data:/data/db
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:3-management
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   main_service:
     build: ./main_service
@@ -33,6 +48,7 @@ services:
       - "5001:5001"
     environment:
       - DATABASE_URL=postgresql://omermunk:1234@db:5432/users_subjects_db
+      - RABBITMQ_HOST=rabbitmq
 
   mail_service:
     build: ./mail_service
@@ -41,17 +57,20 @@ services:
     ports:
       - "5002:5002"
     environment:
-      - DATABASE_URL=postgresql://omermunk:1234@db:5432/users_subjects_db
+      - RABBITMQ_HOST=rabbitmq
 
   shipping_service:
     build: ./shipping_service
     depends_on:
-      - db-mongo
-      - rabbitmq
+      db-mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     ports:
       - "5003:5003"
     environment:
-      - DATABASE_URL=postgresql://omermunk:1234@db:5432/users_subjects_db
+      - RABBITMQ_HOST=rabbitmq
+      - MONGO_HOST=db-mongo
 
   purchase_service:
     build: ./purchase_service
@@ -61,7 +80,8 @@ services:
     ports:
       - "5004:5004"
     environment:
-      - DATABASE_URL=postgresql://omermunk:1234@db:5432/users_subjects_db
+      - RABBITMQ_HOST=rabbitmq
+      - MONGO_HOST=db-mongo
 
   inventory_service:
     build: ./inventory_service
@@ -71,9 +91,8 @@ services:
     ports:
       - "5005:5005"
     environment:
+      - RABBITMQ_HOST=rabbitmq
       - DATABASE_URL=postgresql://omermunk:1234@db:5432/users_subjects_db
-
-
 
 volumes:
   db_data:
