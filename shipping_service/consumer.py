@@ -7,6 +7,9 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
+# לך למשתני סביבה, תחפש לי משתנה סביבה שקוראים לו  RABBITMQ_HOST, אם לא מצאת אחד זה, שים משהו דיפולטיבי - rabbitmq
+# יכול להיות שמאחורי הקלעים
+# RABBITMQ_HOST = 182.8.56.882:1945
 rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'rabbitmq')
 mongo_host = os.environ.get('MONGO_HOST', 'db-mongo')
 
@@ -58,8 +61,9 @@ def main():
 
     channel.basic_consume(queue='shipping_queue', on_message_callback=callback)
 
-    print(' [*] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()
+    print(' [*] Waiting for messages. To exit press CTRL+C')
+
 
 if __name__ == "__main__":
     main()
